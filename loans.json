@@ -1,0 +1,93 @@
+[
+  {
+    "id": "l-1789156429507-uf1s0",
+    "userId": "u-1789156369610-8sf3b",
+    "monto": 2000,
+    "plazo": 2,
+    "tasa": 4,
+    "cuotaMensual": 1060.39,
+    "totalAPagar": 2120.78,
+    "garantia": null,
+    "evaluacion": {
+      "decision": "aprobado_automatico",
+      "score": 700,
+      "ratio": 0.21,
+      "ltv": null,
+      "razones": [
+        "ratio_endeudamiento_optimo"
+      ]
+    },
+    "estado": "activo",
+    "cuotas": [
+      {
+        "numero": 1,
+        "fecha_vencimiento": "2026-10-11",
+        "monto_capital": 980.39,
+        "monto_interes": 80,
+        "monto_total": 1060.39,
+        "estado": "pagada",
+        "dias_mora": 0
+      },
+      {
+        "numero": 2,
+        "fecha_vencimiento": "2026-11-11",
+        "monto_capital": 1019.61,
+        "monto_interes": 40.78,
+        "monto_total": 1060.39,
+        "estado": "pendiente",
+        "dias_mora": 0
+      }
+    ],
+    "pagos": [
+      {
+        "numeroCuota": 1,
+        "monto": 1060.39,
+        "metodo": "Zelle",
+        "fecha": "2026-09-11T19:54:08.765Z"
+      }
+    ],
+    "createdAt": "2026-09-11T19:53:49.507Z"
+  },
+  {
+    "id": "l-1789156538659-myjf8",
+    "userId": "u-1789156369610-8sf3b",
+    "monto": 2000,
+    "plazo": 2,
+    "tasa": 4,
+    "cuotaMensual": 1060.39,
+    "totalAPagar": 2120.78,
+    "garantia": null,
+    "evaluacion": {
+      "decision": "aprobado_automatico",
+      "score": 700,
+      "ratio": 0.21,
+      "ltv": null,
+      "razones": [
+        "ratio_endeudamiento_optimo"
+      ]
+    },
+    "estado": "activo",
+    "cuotas": [
+      {
+        "numero": 1,
+        "fecha_vencimiento": "2026-10-11",
+        "monto_capital": 980.39,
+        "monto_interes": 80,
+        "monto_total": 1060.39,
+        "estado": "pendiente",
+        "dias_mora": 0
+      },
+      {
+        "numero": 2,
+        "fecha_vencimiento": "2026-11-11",
+        "monto_capital": 1019.61,
+        "monto_interes": 40.78,
+        "monto_total": 1060.39,
+        "estado": "pendiente",
+        "dias_mora": 0
+      }
+    ],
+    "pagos": [],
+    "createdAt": "2026-09-11T19:55:38.659Z"
+  }
+]

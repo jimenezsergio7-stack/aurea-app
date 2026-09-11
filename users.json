@@ -1,0 +1,29 @@
+[
+  {
+    "id": "admin-1789155725912",
+    "name": "Administrador Áurea",
+    "email": "admin@aurea.com",
+    "phone": "",
+    "salt": "9f88c549bb8c16450418c3cdd4054ef5",
+    "passwordHash": "6ba2d64d9fd9446c906118fde19782130707d99117626995f3bdb34759754ae06f949da20abef9091b68a01e7b1698bfd3d50082121767f6e7f8e77a2aa9b595",
+    "role": "admin",
+    "kyc": {},
+    "createdAt": "2026-09-11T19:42:05.942Z"
+  },
+  {
+    "id": "u-1789156369610-8sf3b",
+    "name": "sergio jimenez",
+    "email": "jimenezsergio7@gmail.com",
+    "phone": "4082104239",
+    "salt": "f47bfc428e4af86b0e8a05ff51bedf37",
+    "passwordHash": "15e44242137c029872923adf61ed25b9ecfedf54719d7caf561c38e3a067d09c2391e5de726b3b14195973ab075d5bc2610bfe527794a55b2f3d05e838b52901",
+    "role": "client",
+    "kyc": {
+      "id": false,
+      "selfie": true,
+      "domicilio": true,
+      "ingresos": false
+    },
+    "createdAt": "2026-09-11T19:52:49.675Z"
+  }
+]
