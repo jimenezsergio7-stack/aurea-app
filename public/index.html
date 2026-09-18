@@ -130,13 +130,10 @@
         <input type="range" id="plazoRange" min="1" max="24" step="1" value="6" oninput="updateSim()">
       </div>
       <div class="slider-block">
-        <div class="row"><span class="label" data-i18n="monthly_rate">Tasa mensual</span><span class="value gold" id="tasaLabel">5.0%</span></div>
-        <input type="range" id="tasaRange" min="2" max="20" step="0.5" value="5" oninput="updateSim()">
-      </div>
-      <div class="slider-block">
         <div class="row"><span class="label" data-i18n="income_label">Ingreso mensual aprox.</span></div>
         <input type="number" id="ingresoInput" placeholder="$1,500" oninput="updateSim()">
       </div>
+      <div class="note-box" data-i18n="rate_auto_note">Tu tasa mensual se asigna automáticamente entre 5% y 20% según tu perfil (historial de pago, capacidad de pago y garantía) — no se elige manualmente.</div>
     </div>
     <button class="btn-primary" onclick="go('screen-kyc')" data-i18n="continue_app">Continuar solicitud</button>
   </div>
@@ -236,6 +233,7 @@ const dict = {
     sim_title:"¿Cuánto necesitas?", sim_sub:"Ajusta el monto, el plazo y la tasa.",
     per_month:"/mes", amount_requested:"Monto solicitado", term:"Plazo", monthly_rate:"Tasa mensual",
     income_label:"Ingreso mensual aprox.", continue_app:"Continuar solicitud",
+    rate_auto_note:"Tu tasa mensual se asigna automáticamente entre 5% y 20% según tu perfil (historial de pago, capacidad de pago y garantía) — no se elige manualmente.",
     kyc_title:"Verifica tu identidad", kyc_sub:"Marca cada documento como subido (en producción esto conecta con Onfido/Jumio para verificación real).",
     kyc_note:"Tus documentos se cifran y solo se usan para verificar tu identidad y capacidad de pago.",
     next:"Siguiente", back:"Atrás",
@@ -266,6 +264,7 @@ const dict = {
     sim_title:"How much do you need?", sim_sub:"Adjust the amount, term, and rate.",
     per_month:"/mo", amount_requested:"Amount requested", term:"Term", monthly_rate:"Monthly rate",
     income_label:"Approx. monthly income", continue_app:"Continue application",
+    rate_auto_note:"Your monthly rate is assigned automatically between 5% and 20% based on your profile (payment history, repayment capacity, and collateral) — it isn't chosen manually.",
     kyc_title:"Verify your identity", kyc_sub:"Mark each document as uploaded (in production this connects to Onfido/Jumio for real verification).",
     kyc_note:"Your documents are encrypted and only used to verify your identity and repayment capacity.",
     next:"Next", back:"Back",
@@ -372,17 +371,21 @@ function enterApp(){
 }
 
 // -------- SIMULADOR --------
+// El cliente ya no elige la tasa: se muestra el rango posible (5%–20%)
+// según el perfil, y la tasa exacta se asigna al enviar la solicitud.
+function cuotaConTasa(monto, plazo, tasaPct){
+  const i = tasaPct/100;
+  return monto * (i*Math.pow(1+i,plazo)) / (Math.pow(1+i,plazo)-1);
+}
 function updateSim(){
   const monto = parseFloat(document.getElementById('montoRange').value);
   const plazo = parseInt(document.getElementById('plazoRange').value);
-  const tasaPct = parseFloat(document.getElementById('tasaRange').value);
   document.getElementById('montoLabel').textContent = '$' + monto.toLocaleString();
   document.getElementById('plazoLabel').textContent = plazo + ' ' + (currentLang==='en' ? (plazo===1?'month':'months') : (plazo===1?'mes':'meses'));
-  document.getElementById('tasaLabel').textContent = tasaPct.toFixed(1) + '%';
-  const i = tasaPct/100, n = plazo;
-  const cuota = monto * (i*Math.pow(1+i,n)) / (Math.pow(1+i,n)-1);
-  document.getElementById('simCuota').innerHTML = '$' + cuota.toFixed(2) + '<span>' + t('per_month') + '</span>';
-  document.getElementById('simTotal').textContent = (currentLang==='en'?'Total to pay: $':'Total a pagar: $') + (cuota*n).toFixed(2);
+  const cuotaMin = cuotaConTasa(monto, plazo, 5);
+  const cuotaMax = cuotaConTasa(monto, plazo, 20);
+  document.getElementById('simCuota').innerHTML = '$' + cuotaMin.toFixed(2) + ' – $' + cuotaMax.toFixed(2) + '<span>' + t('per_month') + '</span>';
+  document.getElementById('simTotal').textContent = (currentLang==='en'?'Estimated range · rate assigned at approval':'Rango estimado · tasa asignada al aprobar');
 }
 
 // -------- KYC --------
@@ -431,15 +434,12 @@ function selectChip(el){
 function buildResumen(){
   const monto = parseFloat(document.getElementById('montoRange').value);
   const plazo = parseInt(document.getElementById('plazoRange').value);
-  const tasa = parseFloat(document.getElementById('tasaRange').value);
-  const i = tasa/100;
-  const cuota = monto * (i*Math.pow(1+i,plazo)) / (Math.pow(1+i,plazo)-1);
+  const cuotaMin = cuotaConTasa(monto, plazo, 5);
+  const cuotaMax = cuotaConTasa(monto, plazo, 20);
   document.getElementById('resumenCard').innerHTML = `
     <div class="row" style="margin-bottom:10px;"><span class="label">${currentLang==='en'?'Amount':'Monto'}</span><span class="value">$${monto}</span></div>
     <div class="row" style="margin-bottom:10px;"><span class="label">${t('term')}</span><span class="value">${plazo}</span></div>
-    <div class="row" style="margin-bottom:10px;"><span class="label">${t('monthly_rate')}</span><span class="value">${tasa.toFixed(1)}%</span></div>
-    <div class="row" style="margin-bottom:10px;"><span class="label">${currentLang==='en'?'Monthly payment':'Cuota mensual'}</span><span class="value gold">$${cuota.toFixed(2)}</span></div>
-    <div class="row"><span class="label">${currentLang==='en'?'Total to pay':'Total a pagar'}</span><span class="value">$${(cuota*plazo).toFixed(2)}</span></div>
+    <div class="row"><span class="label">${currentLang==='en'?'Estimated payment (5%–20%)':'Cuota estimada (5%–20%)'}</span><span class="value gold">$${cuotaMin.toFixed(2)} – $${cuotaMax.toFixed(2)}</span></div>
   `;
 }
 document.addEventListener('click', (e)=>{
@@ -452,7 +452,6 @@ async function submitLoan(){
   document.getElementById('submitError').innerHTML = '';
   const monto = parseFloat(document.getElementById('montoRange').value);
   const plazo = parseInt(document.getElementById('plazoRange').value);
-  const tasa = parseFloat(document.getElementById('tasaRange').value);
   const ingresoMensual = parseFloat(document.getElementById('ingresoInput').value) || 0;
   const valorTasado = parseFloat(document.getElementById('valorTasadoInput').value) || 0;
   const metodoEl = document.querySelector('#metodoChips .chip.selected');
@@ -463,7 +462,7 @@ async function submitLoan(){
     : null;
 
   try{
-    const data = await api('/api/loans/apply','POST',{ monto, plazo, tasa, ingresoMensual, garantia, metodo });
+    const data = await api('/api/loans/apply','POST',{ monto, plazo, ingresoMensual, garantia, metodo });
     showResult(data.loan);
   }catch(e){
     document.getElementById('submitError').innerHTML = `<div class="note-box error">${e.message}</div>`;
