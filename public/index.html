@@ -103,4 +103,538 @@
     <div class="card">
       <input type="text" id="regName" placeholder="Nombre completo" data-i18n-ph="ph_name">
       <input type="email" id="authEmail" placeholder="Email">
-      <input
+      <input type="text" id="regPhone" placeholder="Teléfono" data-i18n-ph="ph_phone">
+      <input type="password" id="authPassword" placeholder="Contraseña" data-i18n-ph="ph_password">
+      <button class="btn-primary" onclick="register()" data-i18n="btn_register">Crear cuenta</button>
+      <button class="btn-secondary" onclick="login()" data-i18n="btn_login">Ya tengo cuenta — iniciar sesión</button>
+    </div>
+    <div class="note-box" data-i18n="admin_hint">¿Eres el administrador? Usa admin@aurea.com y la contraseña que se muestra en la consola del servidor la primera vez que arrancó.</div>
+    <div id="authError"></div>
+  </div>
+
+  <!-- SIMULADOR -->
+  <div class="screen hidden" id="screen-simulador">
+    <h1 class="page-title" data-i18n="sim_title">¿Cuánto necesitas?</h1>
+    <p class="page-sub" data-i18n="sim_sub">Ajusta el monto, el plazo y la tasa.</p>
+    <div class="card">
+      <div class="big-result">
+        <div class="amount" id="simCuota">$0<span data-i18n="per_month">/mes</span></div>
+        <div class="caption" id="simTotal">Total a pagar: $0</div>
+      </div>
+      <div class="slider-block">
+        <div class="row"><span class="label" data-i18n="amount_requested">Monto solicitado</span><span class="value gold" id="montoLabel">$1,000</span></div>
+        <input type="range" id="montoRange" min="200" max="5000" step="50" value="1000" oninput="updateSim()">
+      </div>
+      <div class="slider-block">
+        <div class="row"><span class="label" data-i18n="term">Plazo</span><span class="value gold" id="plazoLabel">6 meses</span></div>
+        <input type="range" id="plazoRange" min="1" max="24" step="1" value="6" oninput="updateSim()">
+      </div>
+      <div class="slider-block">
+        <div class="row"><span class="label" data-i18n="income_label">Ingreso mensual aprox.</span></div>
+        <input type="number" id="ingresoInput" placeholder="$1,500" oninput="updateSim()">
+      </div>
+      <div class="note-box" data-i18n="rate_auto_note">Tu tasa mensual se asigna automáticamente entre 5% y 20% según tu perfil (historial de pago, capacidad de pago y garantía) — no se elige manualmente.</div>
+    </div>
+    <button class="btn-primary" onclick="go('screen-kyc')" data-i18n="continue_app">Continuar solicitud</button>
+  </div>
+
+  <!-- KYC -->
+  <div class="screen hidden" id="screen-kyc">
+    <h1 class="page-title" data-i18n="kyc_title">Verifica tu identidad</h1>
+    <p class="page-sub" data-i18n="kyc_sub">Marca cada documento como subido (en producción esto conecta con Onfido/Jumio para verificación real).</p>
+    <div class="card" id="kycList"></div>
+    <div class="note-box" data-i18n="kyc_note">Tus documentos se cifran y solo se usan para verificar tu identidad y capacidad de pago.</div>
+    <button class="btn-primary" onclick="go('screen-garantia')" data-i18n="next">Siguiente</button>
+    <button class="btn-secondary" onclick="go('screen-simulador')" data-i18n="back">Atrás</button>
+  </div>
+
+  <!-- GARANTÍA -->
+  <div class="screen hidden" id="screen-garantia">
+    <h1 class="page-title" data-i18n="col_title">Agregar garantía</h1>
+    <p class="page-sub" data-i18n="col_sub">Opcional, pero mejora tu oferta.</p>
+    <div class="type-grid">
+      <div class="type-card" onclick="selectType(this,'gold')"><div class="ic">🟡</div><div class="tn" data-i18n="type_gold">Oro / Joyas</div></div>
+      <div class="type-card" onclick="selectType(this,'vehiculo')"><div class="ic">🚗</div><div class="tn" data-i18n="type_vehicle">Vehículo</div></div>
+      <div class="type-card" onclick="selectType(this,'electronico')"><div class="ic">📺</div><div class="tn" data-i18n="type_electronics">Electrónico</div></div>
+      <div class="type-card" onclick="selectType(this,'ninguna')"><div class="ic">🚫</div><div class="tn" data-i18n="type_none">Sin garantía</div></div>
+    </div>
+    <div class="card" id="garantiaValorCard">
+      <div class="row"><span class="label" data-i18n="est_value">Valor estimado del bien</span></div>
+      <input type="number" id="valorTasadoInput" placeholder="$1,800" oninput="updateGarantiaResumen()">
+      <div class="row" style="margin-top:6px;"><span class="label" data-i18n="max_loan_dyn">Monto máx. prestable (60%)</span><span class="value" id="maxLoanLabel">$0</span></div>
+    </div>
+    <button class="btn-primary" onclick="go('screen-resumen')" data-i18n="next">Siguiente</button>
+    <button class="btn-secondary" onclick="go('screen-kyc')" data-i18n="back">Atrás</button>
+  </div>
+
+  <!-- RESUMEN -->
+  <div class="screen hidden" id="screen-resumen">
+    <h1 class="page-title" data-i18n="sum_title">Confirma tu préstamo</h1>
+    <p class="page-sub" data-i18n="sum_sub">Revisa las condiciones antes de enviar.</p>
+    <div class="card" id="resumenCard"></div>
+    <div class="card">
+      <div class="row"><span class="label" data-i18n="disbursement_method">Método de desembolso</span></div>
+      <div class="chip-row" id="metodoChips">
+        <div class="chip selected" data-metodo="Zelle" onclick="selectChip(this)">🇿 Zelle</div>
+        <div class="chip" data-metodo="Tarjeta/ACH" onclick="selectChip(this)">💳 <span data-i18n="card_ach">Tarjeta/ACH</span></div>
+        <div class="chip" data-metodo="Transferencia" onclick="selectChip(this)">🏦 <span data-i18n="bank_transfer">Transferencia</span></div>
+        <div class="chip" data-metodo="PayPal" onclick="selectChip(this)">🅿️ PayPal</div>
+      </div>
+      <div class="note-box" style="margin-top:12px;" data-i18n="zelle_hint">Zelle disponible para montos hasta $500.</div>
+    </div>
+    <div id="submitError"></div>
+    <button class="btn-primary" id="submitBtn" onclick="submitLoan()" data-i18n="sign_apply">Firmar y solicitar</button>
+    <button class="btn-secondary" onclick="go('screen-garantia')" data-i18n="back">Atrás</button>
+  </div>
+
+  <!-- CONFIRMACIÓN -->
+  <div class="screen hidden" id="screen-firmado">
+    <div style="text-align:center; padding:40px 10px 10px;">
+      <div style="font-size:44px; margin-bottom:10px;" id="resultIcon">✅</div>
+      <h1 class="page-title" style="text-align:center;" id="resultTitle">Solicitud enviada</h1>
+      <p class="page-sub" style="text-align:center;" id="resultSub"></p>
+    </div>
+    <div class="card"><div class="row"><span class="label" data-i18n="status">Estado</span><span class="status-pill" id="resultBadge"></span></div></div>
+    <button class="btn-primary" onclick="go('screen-dashboard'); loadDashboard();" data-i18n="view_account">Ver mi cuenta</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="screen hidden" id="screen-dashboard">
+    <h1 class="page-title"><span data-i18n="hello">Hola</span>, <span id="dashName"></span></h1>
+    <p class="page-sub" data-i18n="dash_sub">Este es el estado de tus préstamos.</p>
+    <div id="dashLoans"></div>
+  </div>
+
+  <!-- PAGO POR ZELLE -->
+  <div class="screen hidden" id="screen-zelle">
+    <h1 class="page-title" data-i18n="zelle_pay_title">Pagar por Zelle</h1>
+    <p class="page-sub" data-i18n="zelle_pay_sub">Envía el pago desde la app de tu banco a este contacto de Zelle.</p>
+    <div class="card">
+      <div class="row" style="margin-bottom:10px;"><span class="label" data-i18n="amount_to_send">Monto a enviar</span><span class="value gold" id="zelleMonto">$0</span></div>
+      <div class="row"><span class="label" data-i18n="zelle_contact">Contacto Zelle</span><span class="value" id="zelleContacto">—</span></div>
+    </div>
+    <div class="note-box" data-i18n="zelle_steps">1) Abre la app de tu banco. 2) Envía el monto exacto por Zelle al contacto de arriba. 3) Cuando ya lo hayas enviado, confirma aquí abajo.</div>
+    <div class="note-box warn" data-i18n="zelle_pending_note">Tu pago quedará "en revisión" hasta que el administrador confirme que lo recibió — esto puede tardar. Zelle no lo confirma automáticamente.</div>
+    <button class="btn-primary" id="zelleConfirmBtn" onclick="confirmarEnvioPago()" data-i18n="zelle_confirm_btn">Ya envié el pago</button>
+    <button class="btn-secondary" onclick="go('screen-dashboard')" data-i18n="back">Atrás</button>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="screen hidden" id="screen-admin">
+    <h1 class="page-title" data-i18n="admin_title">Solicitudes</h1>
+    <p class="page-sub" data-i18n="admin_sub">Cola de aprobación — resultado real del motor de decisión.</p>
+    <div class="section-title" data-i18n="pagos_pendientes_title">Pagos reportados por confirmar</div>
+    <div id="pagosPendientes"></div>
+    <div class="section-title" data-i18n="solicitudes_title">Solicitudes</div>
+    <div id="adminQueue"></div>
+  </div>
+
+  <div class="bottom-nav hidden" id="clientNav">
+    <button class="nav-item" onclick="go('screen-simulador')"><span class="ic">🧮</span><span data-i18n="tab_simulate">Simular</span></button>
+    <button class="nav-item" onclick="go('screen-dashboard'); loadDashboard();"><span class="ic">🏠</span><span data-i18n="tab_account">Mi cuenta</span></button>
+    <button class="nav-item" onclick="logout()"><span class="ic">🚪</span><span data-i18n="tab_logout">Salir</span></button>
+  </div>
+  <div class="bottom-nav hidden" id="adminNav">
+    <button class="nav-item" onclick="go('screen-admin'); loadAdmin();"><span class="ic">📋</span><span data-i18n="tab_queue">Cola</span></button>
+    <button class="nav-item" onclick="logout()"><span class="ic">🚪</span><span data-i18n="tab_logout">Salir</span></button>
+  </div>
+</div>
+
+<script>
+const dict = {
+  es: {
+    auth_title:"Bienvenido", auth_sub:"Inicia sesión o crea tu cuenta para solicitar un préstamo.",
+    ph_name:"Nombre completo", ph_phone:"Teléfono", ph_password:"Contraseña",
+    btn_register:"Crear cuenta", btn_login:"Ya tengo cuenta — iniciar sesión",
+    admin_hint:"¿Eres el administrador? Usa admin@aurea.com y la contraseña que se muestra en la consola del servidor la primera vez que arrancó.",
+    sim_title:"¿Cuánto necesitas?", sim_sub:"Ajusta el monto, el plazo y la tasa.",
+    per_month:"/mes", amount_requested:"Monto solicitado", term:"Plazo", monthly_rate:"Tasa mensual",
+    income_label:"Ingreso mensual aprox.", continue_app:"Continuar solicitud",
+    rate_auto_note:"Tu tasa mensual se asigna automáticamente entre 5% y 20% según tu perfil (historial de pago, capacidad de pago y garantía) — no se elige manualmente.",
+    kyc_title:"Verifica tu identidad", kyc_sub:"Marca cada documento como subido (en producción esto conecta con Onfido/Jumio para verificación real).",
+    kyc_note:"Tus documentos se cifran y solo se usan para verificar tu identidad y capacidad de pago.",
+    next:"Siguiente", back:"Atrás",
+    col_title:"Agregar garantía", col_sub:"Opcional, pero mejora tu oferta.",
+    type_gold:"Oro / Joyas", type_vehicle:"Vehículo", type_electronics:"Electrónico", type_none:"Sin garantía",
+    est_value:"Valor estimado del bien", max_loan_dyn:"Monto máx. prestable (60%)",
+    sum_title:"Confirma tu préstamo", sum_sub:"Revisa las condiciones antes de enviar.",
+    disbursement_method:"Método de desembolso", card_ach:"Tarjeta/ACH", bank_transfer:"Transferencia",
+    zelle_hint:"Zelle disponible para montos hasta $500.", sign_apply:"Firmar y solicitar",
+    status:"Estado", view_account:"Ver mi cuenta", hello:"Hola", dash_sub:"Este es el estado de tus préstamos.",
+    admin_title:"Solicitudes", admin_sub:"Cola de aprobación — resultado real del motor de decisión.",
+    tab_simulate:"Simular", tab_account:"Mi cuenta", tab_logout:"Salir", tab_queue:"Cola",
+    doc_id:"Identificación oficial", doc_selfie:"Selfie de verificación", doc_domicilio:"Comprobante de domicilio", doc_ingresos:"Comprobante de ingresos",
+    err_login:"Email o contraseña incorrectos.", err_register:"No se pudo crear la cuenta.",
+    tag_auto:"Auto ✓", tag_review:"Revisar", tag_reject:"Rechazo",
+    aprobar:"Aprobar", rechazar:"Rechazar", pagar_cuota:"Pagar cuota", cuota_pagada:"Pagada", cuota_pendiente:"Pendiente",
+    sin_prestamos:"Aún no tienes préstamos. Ve a Simular para pedir uno.",
+    result_aprobado:"¡Aprobado!", result_revision:"En revisión", result_rechazado:"No aprobado",
+    result_sub_aprobado:"Tu préstamo fue aprobado automáticamente por el motor de decisión.",
+    result_sub_revision:"Tu solicitud requiere revisión manual del administrador.",
+    result_sub_rechazado:"No fue posible aprobar tu solicitud en este momento.",
+    zelle_pay_title:"Pagar por Zelle", zelle_pay_sub:"Envía el pago desde la app de tu banco a este contacto de Zelle.",
+    amount_to_send:"Monto a enviar", zelle_contact:"Contacto Zelle",
+    zelle_steps:"1) Abre la app de tu banco. 2) Envía el monto exacto por Zelle al contacto de arriba. 3) Cuando ya lo hayas enviado, confirma aquí abajo.",
+    zelle_pending_note:"Tu pago quedará \"en revisión\" hasta que el administrador confirme que lo recibió — esto puede tardar. Zelle no lo confirma automáticamente.",
+    zelle_confirm_btn:"Ya envié el pago", cuota_reportada:"En revisión", pago_en_revision:"Tienes un pago en revisión, esperando confirmación del administrador.",
+    pagos_pendientes_title:"Pagos reportados por confirmar", solicitudes_title:"Solicitudes",
+    sin_pagos_pendientes:"No hay pagos pendientes de confirmar.", confirmar_recibido:"Confirmar recibido"
+  },
+  en: {
+    auth_title:"Welcome", auth_sub:"Log in or create your account to apply for a loan.",
+    ph_name:"Full name", ph_phone:"Phone", ph_password:"Password",
+    btn_register:"Create account", btn_login:"I have an account — log in",
+    admin_hint:"Are you the admin? Use admin@aurea.com and the password shown in the server console the first time it started.",
+    sim_title:"How much do you need?", sim_sub:"Adjust the amount, term, and rate.",
+    per_month:"/mo", amount_requested:"Amount requested", term:"Term", monthly_rate:"Monthly rate",
+    income_label:"Approx. monthly income", continue_app:"Continue application",
+    rate_auto_note:"Your monthly rate is assigned automatically between 5% and 20% based on your profile (payment history, repayment capacity, and collateral) — it isn't chosen manually.",
+    kyc_title:"Verify your identity", kyc_sub:"Mark each document as uploaded (in production this connects to Onfido/Jumio for real verification).",
+    kyc_note:"Your documents are encrypted and only used to verify your identity and repayment capacity.",
+    next:"Next", back:"Back",
+    col_title:"Add collateral", col_sub:"Optional, but improves your offer.",
+    type_gold:"Gold / Jewelry", type_vehicle:"Vehicle", type_electronics:"Electronics", type_none:"No collateral",
+    est_value:"Estimated asset value", max_loan_dyn:"Max loan amount (60%)",
+    sum_title:"Confirm your loan", sum_sub:"Review the terms before submitting.",
+    disbursement_method:"Disbursement method", card_ach:"Card/ACH", bank_transfer:"Bank transfer",
+    zelle_hint:"Zelle available for amounts up to $500.", sign_apply:"Sign and apply",
+    status:"Status", view_account:"View my account", hello:"Hi", dash_sub:"Here's the status of your loans.",
+    admin_title:"Applications", admin_sub:"Approval queue — real output of the decision engine.",
+    tab_simulate:"Simulate", tab_account:"My account", tab_logout:"Log out", tab_queue:"Queue",
+    doc_id:"Official ID", doc_selfie:"Verification selfie", doc_domicilio:"Proof of address", doc_ingresos:"Proof of income",
+    err_login:"Incorrect email or password.", err_register:"Could not create the account.",
+    tag_auto:"Auto ✓", tag_review:"Review", tag_reject:"Reject",
+    aprobar:"Approve", rechazar:"Reject", pagar_cuota:"Pay installment", cuota_pagada:"Paid", cuota_pendiente:"Pending",
+    sin_prestamos:"You don't have any loans yet. Go to Simulate to request one.",
+    result_aprobado:"Approved!", result_revision:"Under review", result_rechazado:"Not approved",
+    result_sub_aprobado:"Your loan was automatically approved by the decision engine.",
+    result_sub_revision:"Your application needs manual review by the administrator.",
+    result_sub_rechazado:"We couldn't approve your application at this time.",
+    zelle_pay_title:"Pay via Zelle", zelle_pay_sub:"Send the payment from your bank app to this Zelle contact.",
+    amount_to_send:"Amount to send", zelle_contact:"Zelle contact",
+    zelle_steps:"1) Open your bank app. 2) Send the exact amount via Zelle to the contact above. 3) Once sent, confirm below.",
+    zelle_pending_note:"Your payment will stay \"under review\" until the administrator confirms it arrived — this can take a while. Zelle doesn't confirm it automatically.",
+    zelle_confirm_btn:"I already sent the payment", cuota_reportada:"Under review", pago_en_revision:"You have a payment under review, waiting for admin confirmation.",
+    pagos_pendientes_title:"Reported payments to confirm", solicitudes_title:"Applications",
+    sin_pagos_pendientes:"No payments pending confirmation.", confirmar_recibido:"Confirm received"
+  }
+};
+let currentLang = 'es';
+let token = localStorage.getItem('aurea_token') || null;
+let currentUser = JSON.parse(localStorage.getItem('aurea_user') || 'null');
+let selectedGarantiaType = 'ninguna';
+
+function t(key){ return dict[currentLang][key] || key; }
+
+function setLang(lang){
+  currentLang = lang;
+  document.getElementById('langEs').classList.toggle('active', lang==='es');
+  document.getElementById('langEn').classList.toggle('active', lang==='en');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+  renderKyc();
+  updateSim();
+}
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+async function api(path, method='GET', body=null, auth=true){
+  const headers = {'Content-Type':'application/json'};
+  if(auth && token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'Error de red');
+  return data;
+}
+
+async function register(){
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('authEmail').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  const password = document.getElementById('authPassword').value;
+  document.getElementById('authError').innerHTML = '';
+  try{
+    const data = await api('/api/register','POST',{name,email,phone,password}, false);
+    afterAuth(data);
+  }catch(e){
+    document.getElementById('authError').innerHTML = `<div class="note-box error">${e.message}</div>`;
+  }
+}
+async function login(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  document.getElementById('authError').innerHTML = '';
+  try{
+    const data = await api('/api/login','POST',{email,password}, false);
+    afterAuth(data);
+  }catch(e){
+    document.getElementById('authError').innerHTML = `<div class="note-box error">${t('err_login')}</div>`;
+  }
+}
+function afterAuth(data){
+  token = data.token; currentUser = data.user;
+  localStorage.setItem('aurea_token', token);
+  localStorage.setItem('aurea_user', JSON.stringify(currentUser));
+  enterApp();
+}
+function logout(){
+  token = null; currentUser = null;
+  localStorage.removeItem('aurea_token'); localStorage.removeItem('aurea_user');
+  document.getElementById('clientNav').classList.add('hidden');
+  document.getElementById('adminNav').classList.add('hidden');
+  go('screen-auth');
+}
+function enterApp(){
+  if(currentUser.role === 'admin'){
+    document.getElementById('clientNav').classList.add('hidden');
+    document.getElementById('adminNav').classList.remove('hidden');
+    go('screen-admin'); loadAdmin();
+  } else {
+    document.getElementById('adminNav').classList.add('hidden');
+    document.getElementById('clientNav').classList.remove('hidden');
+    document.getElementById('dashName').textContent = currentUser.name;
+    renderKyc();
+    go('screen-simulador');
+  }
+}
+
+// -------- SIMULADOR --------
+function cuotaConTasa(monto, plazo, tasaPct){
+  const i = tasaPct/100;
+  return monto * (i*Math.pow(1+i,plazo)) / (Math.pow(1+i,plazo)-1);
+}
+function updateSim(){
+  const monto = parseFloat(document.getElementById('montoRange').value);
+  const plazo = parseInt(document.getElementById('plazoRange').value);
+  document.getElementById('montoLabel').textContent = '$' + monto.toLocaleString();
+  document.getElementById('plazoLabel').textContent = plazo + ' ' + (currentLang==='en' ? (plazo===1?'month':'months') : (plazo===1?'mes':'meses'));
+  const cuotaMin = cuotaConTasa(monto, plazo, 5);
+  const cuotaMax = cuotaConTasa(monto, plazo, 20);
+  document.getElementById('simCuota').innerHTML = '$' + cuotaMin.toFixed(2) + ' – $' + cuotaMax.toFixed(2) + '<span>' + t('per_month') + '</span>';
+  document.getElementById('simTotal').textContent = (currentLang==='en'?'Estimated range · rate assigned at approval':'Rango estimado · tasa asignada al aprobar');
+}
+
+// -------- KYC --------
+function renderKyc(){
+  const box = document.getElementById('kycList');
+  if(!box) return;
+  const docs = [
+    {k:'id', label:t('doc_id')},
+    {k:'selfie', label:t('doc_selfie')},
+    {k:'domicilio', label:t('doc_domicilio')},
+    {k:'ingresos', label:t('doc_ingresos')},
+  ];
+  const kyc = (currentUser && currentUser.kyc) || {};
+  box.innerHTML = docs.map(d => `
+    <div class="kyc-toggle">
+      <span class="label" style="color:var(--text); font-size:13.5px;">${d.label}</span>
+      <div class="switch ${kyc[d.k] ? 'on':''}" onclick="toggleKyc('${d.k}', this)"><div class="dot"></div></div>
+    </div>`).join('');
+}
+async function toggleKyc(key, el){
+  el.classList.toggle('on');
+  const val = el.classList.contains('on');
+  currentUser.kyc[key] = val;
+  localStorage.setItem('aurea_user', JSON.stringify(currentUser));
+  try{ await api('/api/kyc','POST',{[key]: val}); }catch(e){}
+}
+
+// -------- GARANTÍA --------
+function selectType(el, tipo){
+  document.querySelectorAll('.type-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedGarantiaType = tipo;
+  document.getElementById('garantiaValorCard').style.display = tipo==='ninguna' ? 'none' : 'block';
+  updateGarantiaResumen();
+}
+function updateGarantiaResumen(){
+  const valor = parseFloat(document.getElementById('valorTasadoInput').value) || 0;
+  document.getElementById('maxLoanLabel').textContent = '$' + Math.round(valor*0.6);
+}
+
+// -------- RESUMEN + ENVÍO --------
+function selectChip(el){
+  el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function buildResumen(){
+  const monto = parseFloat(document.getElementById('montoRange').value);
+  const plazo = parseInt(document.getElementById('plazoRange').value);
+  const cuotaMin = cuotaConTasa(monto, plazo, 5);
+  const cuotaMax = cuotaConTasa(monto, plazo, 20);
+  document.getElementById('resumenCard').innerHTML = `
+    <div class="row" style="margin-bottom:10px;"><span class="label">${currentLang==='en'?'Amount':'Monto'}</span><span class="value">$${monto}</span></div>
+    <div class="row" style="margin-bottom:10px;"><span class="label">${t('term')}</span><span class="value">${plazo}</span></div>
+    <div class="row"><span class="label">${currentLang==='en'?'Estimated payment (5%–20%)':'Cuota estimada (5%–20%)'}</span><span class="value gold">$${cuotaMin.toFixed(2)} – $${cuotaMax.toFixed(2)}</span></div>
+  `;
+}
+document.addEventListener('click', (e)=>{
+  if(e.target.closest('[onclick*="screen-resumen"]')) setTimeout(buildResumen, 10);
+});
+
+async function submitLoan(){
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  document.getElementById('submitError').innerHTML = '';
+  const monto = parseFloat(document.getElementById('montoRange').value);
+  const plazo = parseInt(document.getElementById('plazoRange').value);
+  const ingresoMensual = parseFloat(document.getElementById('ingresoInput').value) || 0;
+  const valorTasado = parseFloat(document.getElementById('valorTasadoInput').value) || 0;
+  const metodoEl = document.querySelector('#metodoChips .chip.selected');
+  const metodo = metodoEl ? metodoEl.dataset.metodo : 'Zelle';
+
+  const garantia = selectedGarantiaType !== 'ninguna' && valorTasado > 0
+    ? { tipo: selectedGarantiaType, valorTasado }
+    : null;
+
+  try{
+    const data = await api('/api/loans/apply','POST',{ monto, plazo, ingresoMensual, garantia, metodo });
+    showResult(data.loan);
+  }catch(e){
+    document.getElementById('submitError').innerHTML = `<div class="note-box error">${e.message}</div>`;
+  }
+  btn.disabled = false;
+}
+
+function showResult(loan){
+  const dec = loan.evaluacion.decision;
+  const icon = document.getElementById('resultIcon');
+  const title = document.getElementById('resultTitle');
+  const sub = document.getElementById('resultSub');
+  const badge = document.getElementById('resultBadge');
+  if(dec === 'aprobado_automatico'){
+    icon.textContent = '✅'; title.textContent = t('result_aprobado'); sub.textContent = t('result_sub_aprobado');
+    badge.className = 'status-pill'; badge.style.cssText='background:rgba(95,168,140,.15);color:#5FA88C;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;';
+    badge.textContent = t('tag_auto');
+  } else if(dec === 'revision_manual'){
+    icon.textContent = '⏳'; title.textContent = t('result_revision'); sub.textContent = t('result_sub_revision');
+    badge.style.cssText='background:rgba(201,162,75,.15);color:#C9A24B;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;';
+    badge.textContent = t('tag_review');
+  } else {
+    icon.textContent = '❌'; title.textContent = t('result_rechazado'); sub.textContent = t('result_sub_rechazado');
+    badge.style.cssText='background:rgba(193,97,63,.15);color:#C1613F;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;';
+    badge.textContent = t('tag_reject');
+  }
+  go('screen-firmado');
+}
+
+// -------- DASHBOARD --------
+async function loadDashboard(){
+  document.getElementById('dashName').textContent = currentUser.name;
+  const data = await api('/api/loans/mine');
+  const box = document.getElementById('dashLoans');
+  if(data.loans.length === 0){
+    box.innerHTML = `<div class="note-box">${t('sin_prestamos')}</div>`;
+    return;
+  }
+  box.innerHTML = data.loans.map(loan => {
+    const pagadas = loan.cuotas.filter(c=>c.estado==='pagada').length;
+    const pct = loan.cuotas.length ? Math.round(pagadas/loan.cuotas.length*100) : 0;
+    const saldo = loan.cuotas.filter(c=>c.estado!=='pagada').reduce((s,c)=>s+c.monto_total,0);
+    const proxima = loan.cuotas.find(c=>c.estado!=='pagada');
+    let estadoBadge = '';
+    if(loan.estado==='revision_manual') estadoBadge = `<div class="note-box">${t('tag_review')}</div>`;
+    if(loan.estado==='rechazado') estadoBadge = `<div class="note-box error">${t('tag_reject')}</div>`;
+
+    const cuotasHtml = loan.cuotas.map(c => `
+      <div class="payment-row">
+        <div><div class="pdate">#${c.numero} · ${c.fecha_vencimiento}</div><div class="pmeta">${c.estado==='pagada' ? t('cuota_pagada') : c.estado==='reportado' ? t('cuota_reportada') : t('cuota_pendiente')}</div></div>
+        <span class="value ${c.estado==='pagada'?'good':c.estado==='reportado'?'gold':''}">$${c.monto_total.toFixed(2)}</span>
+      </div>`).join('');
+
+    const payBtn = proxima ? `<button class="btn-primary" onclick="openPagoZelle('${loan.id}', ${proxima.numero}, ${proxima.monto_total})">${t('pagar_cuota')} — $${proxima.monto_total.toFixed(2)}</button>` : '';
+    const reportadaCuota = loan.cuotas.find(c => c.estado === 'reportado');
+    const reportadaMsg = reportadaCuota ? `<div class="note-box">${t('pago_en_revision')}</div>` : '';
+
+    return `
+      <div class="balance-card">
+        <div class="label">$${loan.monto} · ${loan.plazo} ${currentLang==='en'?'months':'meses'} · ${loan.tasa}%</div>
+        <div class="amount">$${saldo.toFixed(2)}</div>
+        ${loan.cuotas.length ? `<div class="progress-bg"><div class="progress-fill" style="width:${pct}%"></div></div>` : ''}
+      </div>
+      ${estadoBadge}
+      ${reportadaMsg}
+      ${payBtn}
+      <div class="section-title">${currentLang==='en'?'Installments':'Cuotas'}</div>
+      <div class="card">${cuotasHtml || '—'}</div>
+    `;
+  }).join('<div style="height:20px;"></div>');
+}
+let pagoActual = null;
+async function openPagoZelle(loanId, numero, monto){
+  pagoActual = { loanId, numero, monto };
+  let zelle = '';
+  try{ const info = await api('/api/payment-info', 'GET', null, false); zelle = info.zelle; }catch(e){}
+  document.getElementById('zelleMonto').textContent = '$' + monto.toFixed(2);
+  document.getElementById('zelleContacto').textContent = zelle || (currentLang==='en' ? 'Not configured yet' : 'Aún no configurado');
+  go('screen-zelle');
+}
+async function confirmarEnvioPago(){
+  if(!pagoActual) return;
+  const btn = document.getElementById('zelleConfirmBtn');
+  btn.disabled = true;
+  try{
+    await api(`/api/loans/${pagoActual.loanId}/pay`,'POST',{ numeroCuota: pagoActual.numero, metodo: 'Zelle' });
+    go('screen-dashboard'); loadDashboard();
+  }catch(e){ alert(e.message); }
+  btn.disabled = false;
+}
+
+// -------- ADMIN --------
+async function loadAdmin(){
+  await loadPagosPendientes();
+  const data = await api('/api/admin/queue');
+  const box = document.getElementById('adminQueue');
+  if(data.loans.length === 0){ box.innerHTML = `<div class="note-box">—</div>`; return; }
+  box.innerHTML = data.loans.map(loan => {
+    const dec = loan.evaluacion.decision;
+    const tagClass = dec==='aprobado_automatico' ? 'auto' : dec==='revision_manual' ? 'review' : 'reject';
+    const tagText = dec==='aprobado_automatico' ? t('tag_auto') : dec==='revision_manual' ? t('tag_review') : t('tag_reject');
+    const actions = loan.estado === 'revision_manual' ? `
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn-secondary" style="margin:0;" onclick="adminDecision('${loan.id}','aprobado')">${t('aprobar')}</button>
+        <button class="btn-secondary" style="margin:0; border-color:var(--bad); color:var(--bad);" onclick="adminDecision('${loan.id}','rechazado')">${t('rechazar')}</button>
+      </div>` : '';
+    return `
+      <div class="queue-row" style="flex-direction:column; align-items:stretch;">
+        <div class="row">
+          <div><div class="qname">${loan.clienteNombre}</div><div class="qmeta">$${loan.monto} · ${loan.plazo}m · ${loan.tasa}% · score ${loan.evaluacion.score}</div></div>
+          <span class="score-tag ${tagClass}">${tagText}</span>
+        </div>
+        ${actions}
+      </div>`;
+  }).join('');
+}
+async function adminDecision(loanId, decision){
+  try{ await api(`/api/admin/loans/${loanId}/decision`,'POST',{decision}); loadAdmin(); }
+  catch(e){ alert(e.message); }
+}
+async function loadPagosPendientes(){
+  const data = await api('/api/admin/pagos-pendientes');
+  const box = document.getElementById('pagosPendientes');
+  if(data.pendientes.length === 0){ box.innerHTML = `<div class="note-box">${t('sin_pagos_pendientes')}</div>`; return; }
+  box.innerHTML = data.pendientes.map(p => `
+    <div class="queue-row">
+      <div class="qleft">
+        <div class="avatar">💰</div>
+        <div><div class="qname">${p.clienteNombre}</div><div class="qmeta">$${p.monto.toFixed(2)} · ${p.metodo} · #${p.numeroCuota}</div></div>
+      </div>
+      <button class="btn-secondary" style="margin:0; width:auto; padding:8px 12px;" onclick="confirmarPago('${p.loanId}', ${p.numeroCuota})">${t('confirmar_recibido')}</button>
+    </div>`).join('');
+}
+async function confirmarPago(loanId, numeroCuota){
+  try{ await api('/api/admin/pagos/confirmar','POST',{loanId, numeroCuota}); loadAdmin(); }
+  catch(e){ alert(e.message); }
+}
+
+// -------- INIT --------
+window.addEventListener('load', ()=>{
+  updateSim();
+  if(token && currentUser){ enterApp(); }
+});
+</script>
+</body>
+</html>
