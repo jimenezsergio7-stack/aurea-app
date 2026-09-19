@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { readUsers, writeUsers, readLoans, writeLoans, hashPassword } = require('./db');
-const { calcularCuota, generarCuotas, evaluarSolicitud } = require('./engine');
+const { calcularCuota, generarCuotas, evaluarSolicitud, asignarTasa } = require('./engine');
 
 const PORT = process.env.PORT || 3000;
 // IMPORTANTE: cambia este secreto por una cadena larga y aleatoria antes de producción.
@@ -118,6 +118,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { token, user: publicUser(user) });
     }
 
+    // ---------- INFO DE PAGO (Zelle, etc.) ----------
+    if (pathname === '/api/payment-info' && req.method === 'GET') {
+      return sendJson(res, 200, { zelle: process.env.AUREA_ZELLE_CONTACTO || '' });
+    }
+
     // ---------- ACTUALIZAR KYC ----------
     if (pathname === '/api/kyc' && req.method === 'POST') {
       const user = getAuthUser(req);
@@ -131,11 +136,19 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---------- SIMULADOR ----------
+    // El cliente nunca elige la tasa: aquí solo devolvemos un rango estimado
+    // (mejor caso 5%, peor caso 20%) para que se haga una idea antes de solicitar.
     if (pathname === '/api/simulate' && req.method === 'POST') {
-      const { monto, plazo, tasa } = await readBody(req);
-      if (!monto || !plazo || tasa === undefined) return sendJson(res, 400, { error: 'monto, plazo y tasa son requeridos' });
-      const cuota = calcularCuota(Number(monto), Number(tasa), Number(plazo));
-      return sendJson(res, 200, { cuota: Math.round(cuota * 100) / 100, total: Math.round(cuota * plazo * 100) / 100 });
+      const { monto, plazo } = await readBody(req);
+      if (!monto || !plazo) return sendJson(res, 400, { error: 'monto y plazo son requeridos' });
+      const cuotaMin = calcularCuota(Number(monto), 5, Number(plazo));
+      const cuotaMax = calcularCuota(Number(monto), 20, Number(plazo));
+      return sendJson(res, 200, {
+        cuotaMin: Math.round(cuotaMin * 100) / 100,
+        cuotaMax: Math.round(cuotaMax * 100) / 100,
+        totalMin: Math.round(cuotaMin * plazo * 100) / 100,
+        totalMax: Math.round(cuotaMax * plazo * 100) / 100
+      });
     }
 
     // ---------- SOLICITAR PRÉSTAMO ----------
@@ -143,22 +156,28 @@ const server = http.createServer(async (req, res) => {
       const user = getAuthUser(req);
       if (!user) return sendJson(res, 401, { error: 'No autenticado' });
       const body = await readBody(req);
-      const { monto, plazo, tasa, ingresoMensual, garantia } = body;
-      if (!monto || !plazo || tasa === undefined) return sendJson(res, 400, { error: 'Faltan datos del préstamo' });
+      const { monto, plazo, ingresoMensual, garantia } = body;
+      if (!monto || !plazo) return sendJson(res, 400, { error: 'Faltan datos del préstamo' });
 
       const loans = readLoans();
       const historialPagosATiempo = loans.filter(l => l.userId === user.id && l.estado === 'pagado').length;
 
+      // La tasa la decide el sistema según el perfil del cliente, nunca el cliente mismo.
+      const tasa = asignarTasa({
+        historialPagosATiempo, ingresoMensual: Number(ingresoMensual) || 0,
+        monto: Number(monto), plazo: Number(plazo), garantia
+      });
+
       const evaluacion = evaluarSolicitud({
-        monto: Number(monto), plazo: Number(plazo), tasa: Number(tasa),
+        monto: Number(monto), plazo: Number(plazo), tasa,
         ingresoMensual: Number(ingresoMensual) || 0, garantia, historialPagosATiempo
       });
 
-      const cuota = calcularCuota(Number(monto), Number(tasa), Number(plazo));
+      const cuota = calcularCuota(Number(monto), tasa, Number(plazo));
       const loan = {
         id: 'l-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
         userId: user.id,
-        monto: Number(monto), plazo: Number(plazo), tasa: Number(tasa),
+        monto: Number(monto), plazo: Number(plazo), tasa,
         cuotaMensual: Math.round(cuota * 100) / 100,
         totalAPagar: Math.round(cuota * plazo * 100) / 100,
         garantia: garantia || null,
@@ -182,7 +201,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { loans });
     }
 
-    // ---------- PAGAR CUOTA ----------
+    // ---------- REPORTAR PAGO (queda pendiente de confirmación del admin) ----------
     const payMatch = pathname.match(/^\/api\/loans\/([^/]+)\/pay$/);
     if (payMatch && req.method === 'POST') {
       const user = getAuthUser(req);
@@ -194,11 +213,58 @@ const server = http.createServer(async (req, res) => {
       const cuota = loan.cuotas.find(c => c.numero === Number(numeroCuota));
       if (!cuota) return sendJson(res, 404, { error: 'Cuota no encontrada' });
       if (cuota.estado === 'pagada') return sendJson(res, 400, { error: 'Esa cuota ya está pagada' });
+      if (cuota.estado === 'reportado') return sendJson(res, 400, { error: 'Ya reportaste este pago, está esperando confirmación' });
 
-      // Aviso de negocio: aquí es donde se conecta el cobro real (Stripe, Zelle, etc.)
-      // En este MVP el pago se registra como confirmado directamente.
+      // El cliente reporta que pagó, pero la cuota NO se marca pagada todavía.
+      // Un pago por Zelle (o cualquier método sin pasarela conectada) requiere
+      // que el administrador confirme manualmente que el dinero llegó.
+      cuota.estado = 'reportado';
+      loan.pagos.push({
+        numeroCuota: cuota.numero, monto: cuota.monto_total, metodo: metodo || 'no especificado',
+        estado: 'pendiente_confirmacion', fechaReportado: new Date().toISOString()
+      });
+      writeLoans(loans);
+      return sendJson(res, 200, { loan });
+    }
+
+    // ---------- ADMIN: PAGOS REPORTADOS PENDIENTES DE CONFIRMAR ----------
+    if (pathname === '/api/admin/pagos-pendientes' && req.method === 'GET') {
+      const user = getAuthUser(req);
+      if (!user || user.role !== 'admin') return sendJson(res, 403, { error: 'Solo administradores' });
+      const users = readUsers();
+      const loans = readLoans();
+      const pendientes = [];
+      loans.forEach(loan => {
+        loan.cuotas.forEach(cuota => {
+          if (cuota.estado === 'reportado') {
+            const pago = loan.pagos.find(p => p.numeroCuota === cuota.numero && p.estado === 'pendiente_confirmacion');
+            pendientes.push({
+              loanId: loan.id,
+              numeroCuota: cuota.numero,
+              clienteNombre: (users.find(u => u.id === loan.userId) || {}).name || 'Desconocido',
+              monto: cuota.monto_total,
+              metodo: pago ? pago.metodo : 'no especificado',
+              fechaReportado: pago ? pago.fechaReportado : null
+            });
+          }
+        });
+      });
+      return sendJson(res, 200, { pendientes });
+    }
+
+    // ---------- ADMIN: CONFIRMAR PAGO RECIBIDO ----------
+    if (pathname === '/api/admin/pagos/confirmar' && req.method === 'POST') {
+      const user = getAuthUser(req);
+      if (!user || user.role !== 'admin') return sendJson(res, 403, { error: 'Solo administradores' });
+      const { loanId, numeroCuota } = await readBody(req);
+      const loans = readLoans();
+      const loan = loans.find(l => l.id === loanId);
+      if (!loan) return sendJson(res, 404, { error: 'Préstamo no encontrado' });
+      const cuota = loan.cuotas.find(c => c.numero === Number(numeroCuota));
+      if (!cuota) return sendJson(res, 404, { error: 'Cuota no encontrada' });
       cuota.estado = 'pagada';
-      loan.pagos.push({ numeroCuota: cuota.numero, monto: cuota.monto_total, metodo: metodo || 'no especificado', fecha: new Date().toISOString() });
+      const pago = loan.pagos.find(p => p.numeroCuota === cuota.numero && p.estado === 'pendiente_confirmacion');
+      if (pago) { pago.estado = 'confirmado'; pago.fechaConfirmado = new Date().toISOString(); }
       if (loan.cuotas.every(c => c.estado === 'pagada')) loan.estado = 'pagado';
       writeLoans(loans);
       return sendJson(res, 200, { loan });
